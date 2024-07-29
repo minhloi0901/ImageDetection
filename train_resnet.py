@@ -30,9 +30,9 @@ class CustomDataset(TorchDataset):
         image = Image.open(img_path).convert('RGB')
         image = image.resize(size, Image.LANCZOS)
 
-        inputs = self.processor(images=image, return_tensors='pt')
+        inputs = self.processor(images=image, return_tensors='pt').to(self.device)
         # Remove extra dimensions and convert tensor to the appropriate shape
-        inputs = {key: val.squeeze(0).to(self.device) for key, val in inputs.items()}
+        inputs = {key: val.squeeze(0) for key, val in inputs.items()}
         return {**inputs, 'label': torch.tensor(label)}
 
 def create_args():
@@ -98,8 +98,6 @@ def main(args):
     # Print sizes of train and test datasets
     print(f"Number of training samples: {len(train_dataset)}")
     print(f"Number of testing samples: {len(test_dataset)}")
-
-    
 
     def compute_metrics(p):
         accuracy = load_metric("accuracy")
