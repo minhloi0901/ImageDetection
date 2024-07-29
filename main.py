@@ -78,6 +78,9 @@ def compute_MRE(
         
         
     images = init_images.clone()
+    for id, image in enumerate(images):
+        image_PIL =  transforms.ToPILImage()(image)
+        image_PIL.save(f"init_image_{k}_{id}.png")
     for k, mask in enumerate(blurred_masks):
         tmp = pipeline(
             prompt=["" for _ in range(N)],
