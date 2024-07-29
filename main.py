@@ -9,18 +9,18 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
-# Function compute MRE
+
 def compute_MRE(
     pipeline,
-    init_image: torch.Tensor,
+    init_images: torch.Tensor,
     device: torch.device,
     num_masks: int,
     blur_factor: float,
     patch_size=(64, 64),
     seed: int = 0,
 ):
-    C, W, H = init_image.size()
-    image_size = (init_image.size(1), init_image.size(2))
+    N, C, W, H = init_images.size()
+    image_size = (init_images.size(2), init_images.size(3))
     rng = torch.Generator(device).manual_seed(seed)
 
     patch_dims = (
@@ -28,7 +28,30 @@ def compute_MRE(
         (image_size[1] + patch_size[1] - 1) // patch_size[1],
     )
     ids_per_mask = (patch_dims[0] * patch_dims[1] + num_masks - 1) // num_masks
-
+    s = set()
+    # masks = [
+    #     [torch.zeros(image_size, dtype=torch.uint8) for _ in range(N)]
+    #     for _ in range(num_masks)
+    # ]
+    # for b in range(N):
+    #     ids = torch.randperm(
+    #         patch_dims[0] * patch_dims[1], generator=rng, device=device
+    #     )
+    #
+    #     for ptr, id in enumerate(ids):
+    #         k = ptr // ids_per_mask
+    #
+    #         patch_x = id // patch_dims[1]
+    #         patch_y = id % patch_dims[1]
+    #         for i in range(
+    #             patch_x * patch_size[0], (patch_x + 1) * patch_size[0]
+    #         ):
+    #             for j in range(
+    #                 patch_y * patch_size[1], (patch_y + 1) * patch_size[1]
+    #             ):
+    #                 if i < image_size[0] and j < image_size[1]:
+    #                     s.add((k, b))
+    #                     masks[k][b][i, j] = 255
     alter_mask = torch.zeros((2, *image_size), device=device)
     for i in range(image_size[0]):
         for j in range(image_size[1]):
@@ -38,26 +61,40 @@ def compute_MRE(
                 alter_mask[0, i, j] = 1
             else:
                 alter_mask[1, i, j] = 1
-    masks = alter_mask.unsqueeze(1).repeat((num_masks, 1, 1, 1)).to(device)
+    masks = alter_mask[:, None, :, :].repeat((1, N, 1, 1))
 
-    blurred_masks = [None for _ in range(num_masks)]
+    blurred_masks = [[None for _ in range(N)] for _ in range(num_masks)]
     for k in range(num_masks):
-        mask = transforms.ToPILImage()(masks[k].squeeze(0).cpu())
-        blurred_masks[k] = transforms.ToTensor()(
-            pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
-        ).to(device)
-
-    image = init_image.clone()
+        for b in range(N):
+            mask = transforms.ToPILImage()(masks[k][b])
+            blurred_masks[k][b] = transforms.ToTensor()(
+                pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
+            ).to(device)
+    
+    for id, blurred_mask in enumerate(blurred_masks):
+        blurred_mask_PIL =  transforms.ToPILImage()(blurred_mask)
+        blurred_mask_PIL.save(f"blurred_image_{id}.png")
+    
+        
+        
+    masks_Pil =  transforms.ToPILImage()(masks)
+    images = init_images.clone()
     for mask in blurred_masks:
         tmp = pipeline(
-            prompt="",
-            image=image.unsqueeze(0).to(device),
-            mask_image=mask.unsqueeze(0).to(device),
+            prompt=["" for _ in range(N)],
+            image=images,
+            mask_image=mask,
             generator=rng,
-        ).images[0]
-        image = transforms.ToTensor()(tmp).to(device)
+        ).images
+        for i in range(len(tmp)):
+            images[i] = transforms.ToTensor()(tmp[i])
+    for id, image in enumerate(images):
+        image_PIL =  transforms.ToPILImage()(image)
+        image_PIL.save(f"image_{id}.png")
+        
+    
+    return torch.abs(images - init_images)
 
-    return torch.abs(image - init_image)
 
 # Argument parser
 def create_args():
@@ -115,7 +152,9 @@ def main(args):
     mre_image_Pil = transforms.ToPILImage()(mre_image_tensor)
     
     mre_image_Pil.save("mre_image.png")
+    print(f"save successful")
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
+    
 
     # Load the trained ResNet model and processor
     processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
