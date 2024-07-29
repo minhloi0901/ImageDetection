@@ -121,8 +121,6 @@ def main(args):
     
     mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
     
-
-    # Display the MRE image
     plt.imshow(mre_image_pil)
     plt.axis('off')  # Hide axes
     plt.show()
