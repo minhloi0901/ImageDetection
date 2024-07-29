@@ -88,7 +88,9 @@ def compute_MRE(
             mask_image=mask,
             generator=rng,
         ).images
+        
         for i in range(len(tmp)):
+            tmp[i].save(f"tmp_{i}.png")
             images[i] = transforms.ToTensor()(tmp[i])
         for id, image in enumerate(images):
             image_PIL =  transforms.ToPILImage()(image)
