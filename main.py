@@ -120,7 +120,7 @@ def main(args):
     # Prepare the MRE image for prediction
     mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
     inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
-    inputs = {key: val.squeeze(0) for key, val in inputs.items()}
+    inputs = {key: val.squeeze(0).unsqueeze(0) for key, val in inputs.items()}
 
     # Check the processed inputs shape
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
