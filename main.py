@@ -71,30 +71,30 @@ def compute_MRE(
                 pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
             ).to(device)
     
-    for id, blurred_mask in enumerate(blurred_masks):
-        blurred_mask_PIL =  transforms.ToPILImage()(blurred_mask[0])
-        blurred_mask_PIL.save(f"blurred_image_{id}.png")
+    # for id, blurred_mask in enumerate(blurred_masks):
+    #     blurred_mask_PIL =  transforms.ToPILImage()(blurred_mask[0])
+    #     blurred_mask_PIL.save(f"blurred_image_{id}.png")
     
         
         
     images = init_images.clone()
     for id, image in enumerate(images):
         image_PIL =  transforms.ToPILImage()(image)
-        image_PIL.save(f"init_image_{k}_{id}.png")
+        # image_PIL.save(f"init_image_{k}_{id}.png")
     for k, mask in enumerate(blurred_masks):
         tmp = pipeline(
             prompt=["" for _ in range(N)],
-            image=images*255,
+            image=images,
             mask_image=mask,
             generator=rng,
         ).images
         
         for i in range(len(tmp)):
-            tmp[i].save(f"tmp_{i}.png")
+            # tmp[i].save(f"tmp_{i}.png")
             images[i] = transforms.ToTensor()(tmp[i])
-        for id, image in enumerate(images):
-            image_PIL =  transforms.ToPILImage()(image)
-            image_PIL.save(f"image_{k}_{id}.png")
+        # for id, image in enumerate(images):
+        #     image_PIL =  transforms.ToPILImage()(image)
+        #     image_PIL.save(f"image_{k}_{id}.png")
         
     
     return torch.abs(images - init_images)
@@ -155,7 +155,7 @@ def main(args):
     )
     mre_image_Pil = transforms.ToPILImage()(mre_image_tensor[0])
     
-    mre_image_Pil.save("mre_image.png")
+    # mre_image_Pil.save("mre_image.png")
     print(f"save successful")
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
     
