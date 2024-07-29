@@ -23,9 +23,13 @@ class CustomDataset(TorchDataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        img = self.images[idx]['image']
+        size = (512, 512)
+        img_path= self.images[idx]['image']
         label = self.images[idx]['label']
-        inputs = self.processor(images=img, return_tensors='pt')
+        image = Image.open(img_path).convert('RGB')
+        image = image.resize(size, Image.LANCZOS)
+        
+        inputs = self.processor(images=image, return_tensors='pt')
         # Remove extra dimensions and convert tensor to the appropriate shape
         inputs = {key: val.squeeze(0) for key, val in inputs.items()}
         return {**inputs, 'label': torch.tensor(label)}
@@ -65,9 +69,7 @@ def load_images(image_dir, label, size=(512, 512)):
     for filename in os.listdir(image_dir):
         if filename.endswith('.jpg') or filename.endswith('.png'):
             img_path = os.path.join(image_dir, filename)
-            image = Image.open(img_path).convert('RGB')
-            image = image.resize(size, Image.LANCZOS)
-            images.append({'image': image, 'label': label})
+            images.append({'image': img_path , 'label': label})
     return images
 
 def main(args):
