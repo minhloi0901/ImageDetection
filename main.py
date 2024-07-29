@@ -7,7 +7,7 @@ from diffusers.pipelines.auto_pipeline import AutoPipelineForInpainting
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 from PIL import Image
 
-# Define your function to compute MRE
+#  function compute MRE
 def compute_MRE(
     pipeline,
     init_image: torch.Tensor,
@@ -88,10 +88,10 @@ def main(args):
     image = image.resize(args.image_size, Image.LANCZOS)
     image_tensor = transforms.ToTensor()(image).to(device)
 
-    # Check the image tensor shape
+
     print(f"Preprocessed image shape: {image_tensor.shape}")
 
-    # Load the diffusion model pipeline
+    
     if args.float16:
         pipeline = AutoPipelineForInpainting.from_pretrained(
             args.diffuser, torch_dtype=torch.float16, variant="fp16"
@@ -110,22 +110,19 @@ def main(args):
         seed=args.seed,
     )
 
-    # Check the MRE image tensor shape
+   
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
 
     # Load the trained ResNet model and processor
     processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
 
-    # Prepare the MRE image for prediction
+    
     mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
     inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
-    inputs = {key: val.squeeze(0).unsqueeze(0) for key, val in inputs.items()}
+    inputs = {key: val.squeeze(0) for key, val in inputs.items()}
 
-    # Check the processed inputs shape
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
-
-    # Make prediction
     model.eval()
     with torch.no_grad():
         outputs = model(**inputs)
