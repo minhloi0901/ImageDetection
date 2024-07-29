@@ -78,7 +78,7 @@ def compute_MRE(
         
         
     images = init_images.clone()
-    for mask in blurred_masks:
+    for k, mask in enumerate(blurred_masks):
         tmp = pipeline(
             prompt=["" for _ in range(N)],
             image=images,
@@ -87,9 +87,9 @@ def compute_MRE(
         ).images
         for i in range(len(tmp)):
             images[i] = transforms.ToTensor()(tmp[i])
-    for id, image in enumerate(images):
-        image_PIL =  transforms.ToPILImage()(image)
-        image_PIL.save(f"image_{id}.png")
+        for id, image in enumerate(images):
+            image_PIL =  transforms.ToPILImage()(image)
+            image_PIL.save(f"image_{k}_{id}.png")
         
     
     return torch.abs(images - init_images)
@@ -148,7 +148,7 @@ def main(args):
         patch_size=args.patch_size,
         seed=args.seed,
     )
-    mre_image_Pil = transforms.ToPILImage()(mre_image_tensor)
+    mre_image_Pil = transforms.ToPILImage()(mre_image_tensor[0])
     
     mre_image_Pil.save("mre_image.png")
     print(f"save successful")
