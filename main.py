@@ -6,9 +6,10 @@ from torchvision import transforms
 from diffusers.pipelines.auto_pipeline import AutoPipelineForInpainting
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 from PIL import Image
-import matplotlib.pyplot as plt  
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
-#  function compute MRE
+# Function compute MRE
 def compute_MRE(
     pipeline,
     init_image: torch.Tensor,
@@ -89,10 +90,8 @@ def main(args):
     image = image.resize(args.image_size, Image.LANCZOS)
     image_tensor = transforms.ToTensor()(image).to(device)
 
-
     print(f"Preprocessed image shape: {image_tensor.shape}")
 
-    
     if args.float16:
         pipeline = AutoPipelineForInpainting.from_pretrained(
             args.diffuser, torch_dtype=torch.float16, variant="fp16"
@@ -112,15 +111,13 @@ def main(args):
     )
     mre_image_pil = transforms.Resize((224, 224))(transforms.ToPILImage()(mre_image_tensor.cpu()))
     mre_image_tensor = transforms.ToTensor()(mre_image_pil).unsqueeze(0).to(device)
-   
+
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
 
     # Load the trained ResNet model and processor
     processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
 
-
-    
     plt.imshow(mre_image_pil)
     plt.axis('off')  # Hide axes
     plt.show()
@@ -129,12 +126,17 @@ def main(args):
     inputs = {key: val.squeeze(0).unsqueeze(0) for key, val in inputs.items()}
 
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
+
     model.eval()
     with torch.no_grad():
         outputs = model(**inputs)
-    prediction = torch.argmax(outputs.logits, dim=1).item()
 
-    print(f"Prediction: {'Real' if prediction == 0 else 'Fake'}")
+    # Calculate probabilities
+    probabilities = F.softmax(outputs.logits, dim=1).cpu().numpy()
+    real_prob, fake_prob = probabilities[0]
+
+    print(f"Real: {real_prob * 100:.2f}%")
+    print(f"Fake: {fake_prob * 100:.2f}%")
 
 if __name__ == "__main__":
     args = create_args()
