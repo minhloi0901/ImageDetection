@@ -36,11 +36,11 @@ def compute_MRE(
                 alter_mask[0, i, j] = 1
             else:
                 alter_mask[1, i, j] = 1
-    masks = alter_mask.unsqueeze(1).repeat((num_masks, 1, 1, 1))
+    masks = alter_mask.unsqueeze(1).repeat((num_masks, 1, 1, 1)).to(device)
 
     blurred_masks = [None for _ in range(num_masks)]
     for k in range(num_masks):
-        mask = transforms.ToPILImage()(masks[k])
+        mask = transforms.ToPILImage()(masks[k].squeeze(0).cpu())
         blurred_masks[k] = transforms.ToTensor()(
             pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
         ).to(device)
@@ -49,11 +49,11 @@ def compute_MRE(
     for mask in blurred_masks:
         tmp = pipeline(
             prompt="",
-            image=image.unsqueeze(0),
-            mask_image=mask.unsqueeze(0),
+            image=image.unsqueeze(0).to(device),
+            mask_image=mask.unsqueeze(0).to(device),
             generator=rng,
         ).images[0]
-        image = transforms.ToTensor()(tmp)
+        image = transforms.ToTensor()(tmp).to(device)
 
     return torch.abs(image - init_image)
 
