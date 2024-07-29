@@ -30,7 +30,7 @@ class CustomDataset(TorchDataset):
         image = Image.open(img_path).convert('RGB')
         image = image.resize(size, Image.LANCZOS)
 
-        inputs = self.processor(images=image, return_tensors='pt').to(self.device)
+        inputs = self.processor(images=image, return_tensors='pt')
         # Remove extra dimensions and convert tensor to the appropriate shape
         inputs = {key: val.squeeze(0) for key, val in inputs.items()}
         return {**inputs, 'label': torch.tensor(label)}
