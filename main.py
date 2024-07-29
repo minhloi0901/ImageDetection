@@ -73,6 +73,7 @@ def create_args():
     parser.add_argument("--num-masks", type=int, default=2, help="Number of masks")
     parser.add_argument("--blur-factor", type=float, default=10, help="Blur factor used for blurring masks")
     parser.add_argument("--patch-size", type=int, nargs=2, default=[64, 64], help="Size of patch used for computing MRE")
+    parser.add_argument("--seed", type=int, default=0, help="Seed used for Generator")
 
     return parser.parse_args()
 
