@@ -1,15 +1,65 @@
 import os
-import torch
-import numpy as np
 from argparse import ArgumentParser
-from PIL import Image
-from tqdm import tqdm
+
+import torch
 from torchvision import transforms
 from diffusers.pipelines.auto_pipeline import AutoPipelineForInpainting
 from transformers import AutoImageProcessor, AutoModelForImageClassification
-from huggingface_hub import login
-import matplotlib.pyplot as plt
+from PIL import Image
 
+# Define your function to compute MRE
+def compute_MRE(
+    pipeline,
+    init_images: torch.Tensor,
+    device: torch.device,
+    num_masks: int,
+    blur_factor: float,
+    patch_size=(64, 64),
+    seed: int = 0,
+):
+    N, C, W, H = init_images.size()
+    image_size = (init_images.size(2), init_images.size(3))
+    rng = torch.Generator(device).manual_seed(seed)
+
+    patch_dims = (
+        (image_size[0] + patch_size[0] - 1) // patch_size[0],
+        (image_size[1] + patch_size[1] - 1) // patch_size[1],
+    )
+    ids_per_mask = (patch_dims[0] * patch_dims[1] + num_masks - 1) // num_masks
+
+    alter_mask = torch.zeros((2, *image_size), device=device)
+    for i in range(image_size[0]):
+        for j in range(image_size[1]):
+            patch_x = i // patch_size[0]
+            patch_y = j // patch_size[1]
+            if (patch_x + patch_y) % 2:
+                alter_mask[0, i, j] = 1
+            else:
+                alter_mask[1, i, j] = 1
+    masks = alter_mask[:, None, :, :].repeat((1, N, 1, 1))
+
+    blurred_masks = [[None for _ in range(N)] for _ in range(num_masks)]
+    for k in range(num_masks):
+        for b in range(N):
+            mask = transforms.ToPILImage()(masks[k][b])
+            blurred_masks[k][b] = transforms.ToTensor()(
+                pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
+            ).to(device)
+
+    images = init_images.clone()
+    for mask in blurred_masks:
+        tmp = pipeline(
+            prompt=["" for _ in range(N)],
+            image=images,
+            mask_image=mask,
+            generator=rng,
+        ).images
+        for i in range(len(tmp)):
+            images[i] = transforms.ToTensor()(tmp[i])
+
+    return torch.abs(images - init_images)
+
+# Argument parser
 def create_args():
     parser = ArgumentParser()
 
@@ -26,107 +76,54 @@ def create_args():
 
     return parser.parse_args()
 
-def compute_MRE(pipeline, init_image, device, num_masks, blur_factor, patch_size, seed=0):
-    C, W, H = init_image.size()
-    image_size = (init_image.size(1), init_image.size(2))
-    rng = torch.Generator(device).manual_seed(seed)
-
-    patch_dims = (
-        (image_size[0] + patch_size[0] - 1) // patch_size[0],
-        (image_size[1] + patch_size[1] - 1) // patch_size[1],
-    )
-    alter_mask = torch.zeros((2, *image_size), device=device)
-    for i in range(image_size[0]):
-        for j in range(image_size[1]):
-            patch_x = i // patch_size[0]
-            patch_y = j // patch_size[1]
-            if (patch_x + patch_y) % 2:
-                alter_mask[0, i, j] = 1
-            else:
-                alter_mask[1, i, j] = 1
-    masks = alter_mask
-
-    blurred_masks = [None for _ in range(num_masks)]
-    for k in range(num_masks):
-        mask = transforms.ToPILImage()(masks[k].cpu())  # Ensure mask is on CPU before converting
-        blurred_masks[k] = transforms.ToTensor()(
-            pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
-        ).to(device)
-
-    image = init_image.clone()
-    for mask in blurred_masks:
-        tmp = pipeline(
-            prompt="",
-            image=image,
-            mask_image=mask,
-            generator=rng,
-        ).images
-        image = transforms.ToTensor()(tmp[0]).to(device)
-
-    return torch.abs(image - init_image)
-
-def predict(image_tensor, processor, model, device, image_size):
-    inputs = processor(images=image_tensor, return_tensors='pt')
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits
-        predictions = torch.argmax(logits, dim=-1)
-    
-    return predictions.item()
-
 def main(args):
     if args.hf_token:
+        from huggingface_hub import login
         login(token=args.hf_token)
     
     device = torch.device(args.device)
-    
-    # Load the image
+    args.device = device
+
+    # Load and preprocess the image
     image = Image.open(args.image_path).convert('RGB')
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Resize(args.image_size),
-    ])
-    image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension
-    
-    # Load the pipeline for MRE computation directly from Hugging Face
+    image = image.resize(args.image_size, Image.LANCZOS)
+    image_tensor = transforms.ToTensor()(image).unsqueeze(0).to(device)
+
+    # Load the diffusion model pipeline
     if args.float16:
-        pipeline = AutoPipelineForInpainting.from_pretrained(args.diffuser, torch_dtype=torch.float16, variant="fp16").to(device)
+        pipeline = AutoPipelineForInpainting.from_pretrained(
+            args.diffuser, torch_dtype=torch.float16, variant="fp16"
+        ).to(device)
     else:
         pipeline = AutoPipelineForInpainting.from_pretrained(args.diffuser).to(device)
 
-    # Compute MRE
+    # Compute the MRE image
     mre_image_tensor = compute_MRE(
         pipeline=pipeline,
-        init_image=image_tensor,
+        init_images=image_tensor,
         device=device,
         num_masks=args.num_masks,
         blur_factor=args.blur_factor,
         patch_size=args.patch_size,
-    ).squeeze(0)  # Remove batch dimension
-    
-    # Convert MRE tensor to PIL Image for display
-    mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
+        seed=args.seed,
+    )
 
-    # Display the MRE image using matplotlib
-    plt.figure(figsize=(8, 8))
-    plt.imshow(mre_image_pil)
-    plt.title("MRE Image")
-    plt.axis('off')
-    plt.show()
-    
-    # Load the classification model and processor directly from Hugging Face
-    processor = AutoImageProcessor.from_pretrained(args.model_path)
-    model = AutoModelForImageClassification.from_pretrained(args.model_path)
-    model.to(device)
+    # Load the trained ResNet model and processor
+    processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
+    model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
+
+    # Prepare the MRE image for prediction
+    mre_image_pil = transforms.ToPILImage()(mre_image_tensor.squeeze(0).cpu())
+    inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
+    inputs = {key: val.squeeze(0) for key, val in inputs.items()}
+
+    # Make prediction
     model.eval()
+    with torch.no_grad():
+        outputs = model(**inputs)
+    prediction = torch.argmax(outputs.logits, dim=1).item()
 
-    prediction = predict(mre_image_tensor, processor, model, device, args.image_size)
-
-    if prediction == 0:
-        print("The image is real.")
-    else:
-        print("The image is fake.")
+    print(f"Prediction: {'Real' if prediction == 0 else 'Fake'}")
 
 if __name__ == "__main__":
     args = create_args()
