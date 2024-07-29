@@ -142,7 +142,7 @@ def main(args):
     # Compute the MRE image
     mre_image_tensor = compute_MRE(
         pipeline=pipeline,
-        init_image=image_tensor,
+        init_images=image_tensor,
         device=device,
         num_masks=args.num_masks,
         blur_factor=args.blur_factor,
