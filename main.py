@@ -87,7 +87,7 @@ def main(args):
         transforms.ToTensor(),
         transforms.Resize(args.image_size),
     ])
-    image_tensor = transform(image).to(device)
+    image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension
     
     # Load the pipeline for MRE computation directly from Hugging Face
     if args.float16:
@@ -103,12 +103,13 @@ def main(args):
         num_masks=args.num_masks,
         blur_factor=args.blur_factor,
         patch_size=args.patch_size,
-    ).squeeze(0)
+    ).squeeze(0)  # Remove batch dimension
     
     # Convert MRE tensor to PIL Image for display
     mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
 
     # Display the MRE image using matplotlib
+    plt.figure(figsize=(8, 8))
     plt.imshow(mre_image_pil)
     plt.title("MRE Image")
     plt.axis('off')
@@ -130,5 +131,3 @@ def main(args):
 if __name__ == "__main__":
     args = create_args()
     main(args)
-#dfafdas
-#aaaa
