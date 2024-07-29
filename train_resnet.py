@@ -15,9 +15,10 @@ from torchvision import transforms
 wandb.init(mode="disabled")
 
 class CustomDataset(TorchDataset):
-    def __init__(self, images, processor):
+    def __init__(self, images, processor, device):
         self.images = images
         self.processor = processor
+        self.device = device
 
     def __len__(self):
         return len(self.images)
@@ -31,7 +32,7 @@ class CustomDataset(TorchDataset):
 
         inputs = self.processor(images=image, return_tensors='pt')
         # Remove extra dimensions and convert tensor to the appropriate shape
-        inputs = {key: val.squeeze(0) for key, val in inputs.items()}
+        inputs = {key: val.squeeze(0).to(self.device) for key, val in inputs.items()}
         return {**inputs, 'label': torch.tensor(label)}
 
 def create_args():
@@ -88,11 +89,11 @@ def main(args):
     # Split dataset with 80% for training and 20% for testing
     train_images, test_images = train_test_split(all_images, test_size=0.2, random_state=args.seed)
 
-    processor = AutoImageProcessor.from_pretrained('microsoft/resnet-50', trust_remote_code=True).to(device)
+    processor = AutoImageProcessor.from_pretrained('microsoft/resnet-50', trust_remote_code=True)
     model = AutoModelForImageClassification.from_pretrained('microsoft/resnet-50', num_labels=2, ignore_mismatched_sizes=True, trust_remote_code=True).to(device)
 
-    train_dataset = CustomDataset(train_images, processor)
-    test_dataset = CustomDataset(test_images, processor)
+    train_dataset = CustomDataset(train_images, processor, device)
+    test_dataset = CustomDataset(test_images, processor, device)
     
     # Print sizes of train and test datasets
     print(f"Number of training samples: {len(train_dataset)}")
