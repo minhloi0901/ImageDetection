@@ -62,7 +62,6 @@ def compute_MRE(
 # Argument parser
 def create_args():
     parser = ArgumentParser()
-
     parser.add_argument("--image-path", type=str, required=True, help="Path to the image for prediction")
     parser.add_argument("--model-path", type=str, required=True, help="Path to the saved model for prediction")
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cpu", help="Device to run the prediction on (cuda or cpu)")
@@ -74,7 +73,6 @@ def create_args():
     parser.add_argument("--blur-factor", type=float, default=10, help="Blur factor used for blurring masks")
     parser.add_argument("--patch-size", type=int, nargs=2, default=[64, 64], help="Size of patch used for computing MRE")
     parser.add_argument("--seed", type=int, default=0, help="Seed used for Generator")
-
     return parser.parse_args()
 
 def main(args):
@@ -86,9 +84,14 @@ def main(args):
     args.device = device
 
     # Load and preprocess the image
+    transform = transforms.Compose(
+        [
+            transforms.PILToTensor(),
+            transforms.Resize(args.image_size),
+        ]
+    )
     image = Image.open(args.image_path).convert('RGB')
-    image = image.resize(args.image_size, Image.LANCZOS)
-    image_tensor = transforms.ToTensor()(image).to(device)
+    image_tensor = transform(image).to(device)
 
     print(f"Preprocessed image shape: {image_tensor.shape}")
 
@@ -109,21 +112,15 @@ def main(args):
         patch_size=args.patch_size,
         seed=args.seed,
     )
-    mre_image_pil = transforms.Resize((224, 224))(transforms.ToPILImage()(mre_image_tensor.cpu()))
-    mre_image_tensor = transforms.ToTensor()(mre_image_pil).unsqueeze(0).to(device)
-
+    mre_image_Pil = transforms.ToPILImage()(mre_image_tensor)
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
 
     # Load the trained ResNet model and processor
     processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
 
-    plt.imshow(mre_image_pil)
-    plt.axis('off')  # Hide axes
-    plt.show()
-
-    inputs = processor(images=mre_image_tensor, return_tensors="pt").to(device)
-    inputs = {key: val.squeeze(0).unsqueeze(0) for key, val in inputs.items()}
+    inputs = processor(images=mre_image_Pil, return_tensors="pt").to(device)
+    inputs = {key: val.squeeze(0) for key, val in inputs.items()}
 
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
 
