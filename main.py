@@ -113,6 +113,8 @@ def main(args):
         seed=args.seed,
     )
     mre_image_Pil = transforms.ToPILImage()(mre_image_tensor)
+    
+    mre_image_Pil.save("mre_image.png")
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
 
     # Load the trained ResNet model and processor
