@@ -72,12 +72,11 @@ def compute_MRE(
             ).to(device)
     
     for id, blurred_mask in enumerate(blurred_masks):
-        blurred_mask_PIL =  transforms.ToPILImage()(blurred_mask)
+        blurred_mask_PIL =  transforms.ToPILImage()(blurred_mask[0])
         blurred_mask_PIL.save(f"blurred_image_{id}.png")
     
         
         
-    masks_Pil =  transforms.ToPILImage()(masks)
     images = init_images.clone()
     for mask in blurred_masks:
         tmp = pipeline(
