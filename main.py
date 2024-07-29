@@ -120,7 +120,7 @@ def main(args):
     model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
 
     inputs = processor(images=mre_image_Pil, return_tensors="pt").to(device)
-    inputs = {key: val.squeeze(0) for key, val in inputs.items()}
+    inputs = {key: val for key, val in inputs.items()}
 
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
 
