@@ -6,6 +6,7 @@ from torchvision import transforms
 from diffusers.pipelines.auto_pipeline import AutoPipelineForInpainting
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 from PIL import Image
+import matplotlib.pyplot as plt  
 
 #  function compute MRE
 def compute_MRE(
@@ -119,6 +120,13 @@ def main(args):
 
     
     mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
+    
+
+    # Display the MRE image
+    plt.imshow(mre_image_pil)
+    plt.axis('off')  # Hide axes
+    plt.show()
+
     inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
     inputs = {key: val.squeeze(0) for key, val in inputs.items()}
 
