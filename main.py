@@ -110,7 +110,8 @@ def main(args):
         patch_size=args.patch_size,
         seed=args.seed,
     )
-
+    mre_image_pil = transforms.Resize((224, 224))(transforms.ToPILImage()(mre_image_tensor.cpu()))
+    mre_image_tensor = transforms.ToTensor()(mre_image_pil).unsqueeze(0).to(device)
    
     print(f"MRE image tensor shape: {mre_image_tensor.shape}")
 
@@ -118,14 +119,13 @@ def main(args):
     processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
 
-    
-    mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
+
     
     plt.imshow(mre_image_pil)
     plt.axis('off')  # Hide axes
     plt.show()
 
-    inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
+    inputs = processor(images=mre_image_tensor, return_tensors="pt").to(device)
     inputs = {key: val.squeeze(0).unsqueeze(0) for key, val in inputs.items()}
 
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
