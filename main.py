@@ -36,7 +36,7 @@ def compute_MRE(
                 alter_mask[0, i, j] = 1
             else:
                 alter_mask[1, i, j] = 1
-    masks = alter_mask[None, :, :].repeat((num_masks, 1, 1))
+    masks = alter_mask.unsqueeze(1).repeat((num_masks, 1, 1, 1))
 
     blurred_masks = [None for _ in range(num_masks)]
     for k in range(num_masks):
