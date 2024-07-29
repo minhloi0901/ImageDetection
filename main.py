@@ -126,7 +126,7 @@ def main(args):
     plt.show()
 
     inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
-    inputs = {key: val.squeeze(0) for key, val in inputs.items()}
+    inputs = {key: val.squeeze(0).unsqueeze(0) for key, val in inputs.items()}
 
     print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
     model.eval()
