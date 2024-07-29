@@ -84,7 +84,7 @@ def compute_MRE(
     for k, mask in enumerate(blurred_masks):
         tmp = pipeline(
             prompt=["" for _ in range(N)],
-            image=images,
+            image=images*255,
             mask_image=mask,
             generator=rng,
         ).images
