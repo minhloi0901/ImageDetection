@@ -10,15 +10,15 @@ from PIL import Image
 # Define your function to compute MRE
 def compute_MRE(
     pipeline,
-    init_images: torch.Tensor,
+    init_image: torch.Tensor,
     device: torch.device,
     num_masks: int,
     blur_factor: float,
     patch_size=(64, 64),
     seed: int = 0,
 ):
-    N, C, W, H = init_images.size()
-    image_size = (init_images.size(2), init_images.size(3))
+    C, W, H = init_image.size()
+    image_size = (init_image.size(1), init_image.size(2))
     rng = torch.Generator(device).manual_seed(seed)
 
     patch_dims = (
@@ -36,28 +36,26 @@ def compute_MRE(
                 alter_mask[0, i, j] = 1
             else:
                 alter_mask[1, i, j] = 1
-    masks = alter_mask[:, None, :, :].repeat((1, N, 1, 1))
+    masks = alter_mask[None, :, :].repeat((num_masks, 1, 1))
 
-    blurred_masks = [[None for _ in range(N)] for _ in range(num_masks)]
+    blurred_masks = [None for _ in range(num_masks)]
     for k in range(num_masks):
-        for b in range(N):
-            mask = transforms.ToPILImage()(masks[k][b])
-            blurred_masks[k][b] = transforms.ToTensor()(
-                pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
-            ).to(device)
+        mask = transforms.ToPILImage()(masks[k])
+        blurred_masks[k] = transforms.ToTensor()(
+            pipeline.mask_processor.blur(mask, blur_factor=blur_factor)
+        ).to(device)
 
-    images = init_images.clone()
+    image = init_image.clone()
     for mask in blurred_masks:
         tmp = pipeline(
-            prompt=["" for _ in range(N)],
-            image=images,
-            mask_image=mask,
+            prompt="",
+            image=image.unsqueeze(0),
+            mask_image=mask.unsqueeze(0),
             generator=rng,
-        ).images
-        for i in range(len(tmp)):
-            images[i] = transforms.ToTensor()(tmp[i])
+        ).images[0]
+        image = transforms.ToTensor()(tmp)
 
-    return torch.abs(images - init_images)
+    return torch.abs(image - init_image)
 
 # Argument parser
 def create_args():
@@ -88,7 +86,10 @@ def main(args):
     # Load and preprocess the image
     image = Image.open(args.image_path).convert('RGB')
     image = image.resize(args.image_size, Image.LANCZOS)
-    image_tensor = transforms.ToTensor()(image).unsqueeze(0).to(device)
+    image_tensor = transforms.ToTensor()(image).to(device)
+
+    # Check the image tensor shape
+    print(f"Preprocessed image shape: {image_tensor.shape}")
 
     # Load the diffusion model pipeline
     if args.float16:
@@ -101,7 +102,7 @@ def main(args):
     # Compute the MRE image
     mre_image_tensor = compute_MRE(
         pipeline=pipeline,
-        init_images=image_tensor,
+        init_image=image_tensor,
         device=device,
         num_masks=args.num_masks,
         blur_factor=args.blur_factor,
@@ -109,14 +110,20 @@ def main(args):
         seed=args.seed,
     )
 
+    # Check the MRE image tensor shape
+    print(f"MRE image tensor shape: {mre_image_tensor.shape}")
+
     # Load the trained ResNet model and processor
     processor = AutoImageProcessor.from_pretrained(args.model_path, trust_remote_code=True)
     model = AutoModelForImageClassification.from_pretrained(args.model_path, trust_remote_code=True).to(device)
 
     # Prepare the MRE image for prediction
-    mre_image_pil = transforms.ToPILImage()(mre_image_tensor.squeeze(0).cpu())
+    mre_image_pil = transforms.ToPILImage()(mre_image_tensor.cpu())
     inputs = processor(images=mre_image_pil, return_tensors="pt").to(device)
     inputs = {key: val.squeeze(0) for key, val in inputs.items()}
+
+    # Check the processed inputs shape
+    print(f"Processed inputs shape: {inputs['pixel_values'].shape}")
 
     # Make prediction
     model.eval()
