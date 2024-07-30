@@ -11,3 +11,4 @@ scikit-learn
 evaluate
 wandb
 matplotlib
+flask
