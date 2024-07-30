@@ -13,7 +13,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = "./model"
 processor = AutoImageProcessor.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForImageClassification.from_pretrained(model_path, trust_remote_code=True).to(device)
-
+# Load Diffuser
+pipeline = AutoPipelineForInpainting.from_pretrained("runwayml/stable-diffusion-inpainting").to(device)
+   
 def compute_MRE(
     pipeline,
     init_images: torch.Tensor,
@@ -115,9 +117,7 @@ def predict():
     ])
     image_tensor = transform(image).unsqueeze(0).to(device)
     
-    # Load Diffuser
-    pipeline = AutoPipelineForInpainting.from_pretrained("runwayml/stable-diffusion-inpainting").to(device)
-    
+     
     # Compute MRE
     mre_image_tensor = compute_MRE(
         pipeline=pipeline,
@@ -141,7 +141,7 @@ def predict():
     
     probabilities = F.softmax(outputs.logits, dim=1).cpu().numpy()
     real_prob, fake_prob = probabilities[0]
-    
+    print(real_prob, fake_prob)
     return jsonify({
         'real_prob': float(real_prob * 100),
         'fake_prob': float(fake_prob * 100)
