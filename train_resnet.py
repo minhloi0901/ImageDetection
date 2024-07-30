@@ -99,6 +99,11 @@ def main(args):
     print(f"Number of training samples: {len(train_dataset)}")
     print(f"Number of testing samples: {len(test_dataset)}")
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 15f45412d1e4f19978a2f9fe8266aa7262cb22cd
     def compute_metrics(p):
         accuracy = load_metric("accuracy")
         return accuracy.compute(predictions=np.argmax(p.predictions, axis=1), references=p.label_ids)
@@ -143,20 +148,6 @@ def main(args):
     with open(os.path.join(args.save_dir, "test_results.txt"), "w") as writer:
         for key, value in results.items():
             writer.write(f"{key}: {value}\n")
-    # Extract misclassified examples
-    misclassified_indices = results.get('misclassified_idx', [])
-    
-    # Load misclassified images
-    misclassified_images = [test_images[idx]['image'] for idx in misclassified_indices]
-    misclassified_labels = [test_images[idx]['label'] for idx in misclassified_indices]
-
-    # Display misclassified images
-    for i, (img, label) in enumerate(zip(misclassified_images, misclassified_labels)):
-        plt.figure(figsize=(5, 5))
-        plt.imshow(img)
-        plt.title(f"Misclassified Image {i + 1}, True Label: {label}")
-        plt.axis('off')
-        plt.show()
 
 if __name__ == "__main__":
     args = create_args()
