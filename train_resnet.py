@@ -99,11 +99,8 @@ def main(args):
     print(f"Number of training samples: {len(train_dataset)}")
     print(f"Number of testing samples: {len(test_dataset)}")
 
-<<<<<<< HEAD
-=======
 
 
->>>>>>> 15f45412d1e4f19978a2f9fe8266aa7262cb22cd
     def compute_metrics(p):
         accuracy = load_metric("accuracy")
         return accuracy.compute(predictions=np.argmax(p.predictions, axis=1), references=p.label_ids)

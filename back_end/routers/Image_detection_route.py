@@ -8,6 +8,6 @@ image_detection_router = Blueprint('image_detection', __name__)
 def root():
     return 'Image detection service'
 
-@image_detection_router.route('/image', methods=['POST'])
+@image_detection_router.route('/image', methods=['GET'])
 def detect_image():
     return Image_detection_controller.detect_image()
